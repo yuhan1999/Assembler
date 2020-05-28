@@ -51,8 +51,6 @@ void buildLitTab(int,list);
 void buildSymTab(int,list); 
 void printLitTab(void);
 void printSymTab(void);
-void setlitTab(void);
-void setsymTab(void);
 void clearList(list);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
@@ -88,20 +86,6 @@ reg regtab[] = {
 	{"F",6},
 };
 
-void setlitTab(void){
-	int i;
-	for(i=0; i<primeTable; i++){
-		litTab[i] = newnode();
-		litTab[i] = NULL;
-	}
-}
-void setsymTab(void){
-	int i;
-	for(i=0; i<primeTable; i++){
-		symTab[i] = newnode();
-		symTab[i] = NULL;
-	}
-}
 list newnode(){				//新增一個 node 
 	list node = (list)malloc(sizeof(struct Node));
 	node -> next = NULL;
@@ -236,24 +220,23 @@ void printLitTab(void){			//還要修+address
 	}
 }
 void buildLitTab(int index,list ptr){
-	int flag = 0;
 	list node = newnode();
 	node -> extend = '=';
 	strcpy(node->opcode, ptr->oper1);
 	
 	if(litTab[index] == NULL){	
+		litTab[index] = newnode();
 		litTab[index] = node;
 	}else{
 		list tmp = litTab[index];
 		while(tmp -> next != NULL){
-			if(strcmp(litTab[index]->opcode, node->opcode) == 0){	//有重複 
-				flag = 1;
+			if(strcmp(tmp->opcode, node->opcode) == 0){	//有重複 
 				break;
 			}else{
 				tmp = tmp -> next;
 			}
 		}
-		if(flag == 0){
+		if(strcmp(tmp->opcode, node->opcode) != 0){
 			tmp -> next = node;
 			
 			list temp = newnode();
@@ -294,6 +277,7 @@ void buildSymTab(int index,list node){
 	strcpy(ptr->name, node->name);
 	
 	if(symTab[index] == NULL){
+		symTab[index] = newnode();
 		symTab[index] = ptr;
 	}else{
 		list tmp = symTab[index];
@@ -360,11 +344,9 @@ void onepass(char* fname){	//建 symTab、litTab、address
 
 int main(){	
 	//建 SymTab
-	setsymTab();
-	setlitTab();
 	onepass("srcpro2.9.txt");
-//	printLitTab();
-//	printSymTab();
+	printLitTab();
+	printSymTab();
 	//symTab("srcpro2.11.txt");
 	Print();
 	
