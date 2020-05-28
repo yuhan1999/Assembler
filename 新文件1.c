@@ -47,13 +47,14 @@ list newnode(void);
 list setnode(char*);
 void Print(void);
 int Hash(char*);
-void buildLitTab(int,list);
+list buildLitTab(int,list);
 void buildSymTab(int,list); 
 void printLitTab(void);
 void printSymTab(void);
 void setlitTab(void);
 void setsymTab(void);
 void clearList(list);
+void addPool(list,list);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
 	{"LDB","m","3/4","68"},
@@ -114,7 +115,7 @@ void Print(void){
 		ptr = ptr->next; 
 	}
 }
-list setnode(char* str){		//把node串起來 
+list setnode(char* str){		//分類String 
 	list node = newnode();
 	int i = 0, j = 0, flag = 0, temp;
 	char tmp[10];
@@ -199,16 +200,7 @@ list setnode(char* str){		//把node串起來
 	j = 0;
 	flag = 0;
 	memset(tmp,'\0',10);
-	//串起來 
-	if(head == NULL){
-		head = node;
-	}else{
-		list ptr = head;
-		while(ptr->next!=NULL){
-			ptr = ptr -> next;
-		}
-		ptr -> next = node;
-	}
+	
 	return node;
 }
 int Hash(char* str){
@@ -235,8 +227,7 @@ void printLitTab(void){			//還要修+address
 		}
 	}
 }
-void buildLitTab(int index,list ptr){
-	int flag = 0;
+list buildLitTab(int index,list ptr){
 	list node = newnode();
 	node -> extend = '=';
 	strcpy(node->opcode, ptr->oper1);
@@ -246,32 +237,23 @@ void buildLitTab(int index,list ptr){
 	}else{
 		list tmp = litTab[index];
 		while(tmp -> next != NULL){
-			if(strcmp(litTab[index]->opcode, node->opcode) == 0){	//有重複 
-				flag = 1;
+			if(strcmp(litTab[index]->opcode, node->opcode) == 0){
 				break;
 			}else{
 				tmp = tmp -> next;
 			}
 		}
-		if(flag == 0){
+		if(strcmp(litTab[index]->opcode, node->opcode) != 0){
 			tmp -> next = node;
-			
-			list temp = newnode();
-			strcpy(temp->name, "*");
-			temp->extend = '=';
-			strcpy(temp->opcode, node->opcode);
-			
-			if(lit_head == NULL){
-				lit_head = temp;
-			}else{
-				list t = lit_head;
-				while(t -> next != NULL){
-					t = t -> next;
-				}
-				t -> next = temp;
-			}	
 		}
 	}
+	
+	list temp = newnode();
+	strcpy(temp->name, "*");
+	temp->extend = '=';
+	strcpy(temp->opcode, node->opcode);
+	
+	return temp;
 }
 void printSymTab(void){
 	int i, j=1;
@@ -311,6 +293,17 @@ void clearList(list first){
 		free(ptr);
 	}
 }
+void addPool(list first, list ptr){
+	if(first == NULL){
+		first = ptr;
+	}else{
+		list tmp = first;
+		while(tmp -> next != NULL){
+			tmp = tmp -> next; 
+		}
+		tmp -> next = ptr;
+	}
+}
 void onepass(char* fname){	//建 symTab、litTab、address	
 	char c;
 	char str[100];
@@ -329,22 +322,28 @@ void onepass(char* fname){	//建 symTab、litTab、address
 			if(str[0] == '.') continue; 		//註解跳過 		
 					
 			list node = setnode(&str[0]);	//把str的內容分類 ，並串起來 
-			
+			addPool(head, node);
 			
 			if(node->mark == '='){			//literal
 				tabIndex = Hash(node->oper1);
-				buildLitTab(tabIndex, node);
+				list ptr = buildLitTab(tabIndex, node);
+				addPool(lit_head, ptr);
+		/*		list temp = lit_head;
+				while(temp != NULL){
+					printf("%s  %c%s",temp->name,temp->extend,temp->opcode);
+					temp = temp -> next;
+				}*/
 			}
 			if(!strcmp(node->opcode, "LTORG")){ //LTORG 常數要加在下面一行 
 				node -> next = lit_head;
 				clearList(lit_head);
 			}
 		
-		/*	if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
+			if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
 				node -> next = lit_head;
 				clearList(lit_head);
 			}
-		*/	
+			
 			if(node->name[0] != '\0' && strcmp(node->name, "COPY") != 0){	//symTab
 				tabIndex = Hash(node->name);
 				buildSymTab(tabIndex, node);
