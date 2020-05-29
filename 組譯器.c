@@ -11,6 +11,14 @@ typedef struct OpTable{		//build Table
 	char code[5];
 	struct OpTable* next;
 }opTable;
+typedef struct Locctr* Use;
+typedef struct Locctr{
+	int counter;	//size
+	int address;	//start
+	char name[10];	//block name
+	int num;		//bloc number
+	Use next;
+}Locctr;
 typedef struct Node* list;
 typedef struct Node{		//產生 節點
 	char name[10];
@@ -22,36 +30,36 @@ typedef struct Node{		//產生 節點
 	char oper2[10];	//運算元 2 
 	int address;
 	char target[20];
+	Use block;
 	list next;
 };
 typedef struct Reg{			//build register Table
 	char name[5];
 	int num;
 }reg;
-typedef struct Locctr* Use;
-typedef struct Locctr{
-	int counter;
-	int address;
-	char name[10];
-	int key;
-	Use next;
-}locctr;
 
 list symTab[primeTable];
 list litTab[primeTable];
 char fname[20];
+int use_num = 1;
 list head = NULL;
 list lit_head = NULL;
+Use useHead = NULL;
 void onepass(char*);
 list newnode(void);
 list setnode(char*);
 void Print(void);
 int Hash(char*);
-void buildLitTab(int,list);
+void buildLitTab(int,list,Use);
 void buildSymTab(int,list); 
 void printLitTab(void);
 void printSymTab(void);
 void clearList(void);
+list searchSymTab(list,char*);
+Use newBlock(void);
+Use buildBlock(char*);
+Use searchBlock(char*);
+int searchOpTab(char*);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
 	{"LDB","m","3/4","68"},
@@ -86,6 +94,12 @@ reg regtab[] = {
 	{"F",6},
 };
 
+Use newBlock(){
+	Use node = (Use)malloc(sizeof(Locctr));
+	node -> next = NULL;
+	node -> counter = 0;
+	return node;
+}
 list newnode(){				//新增一個 node 
 	list node = (list)malloc(sizeof(struct Node));
 	node -> next = NULL;
@@ -94,7 +108,7 @@ list newnode(){				//新增一個 node
 void Print(void){
 	list ptr = head;
 	while(ptr != NULL){
-		printf("%-6s%5c%-6s%5c%-6s%5c%-s\n",ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2);
+		printf("%04X  %-6s%5c%-6s%5c%-6s%5c%-s\n",ptr->address,ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2);
 		ptr = ptr->next; 
 	}
 }
@@ -219,21 +233,23 @@ void printLitTab(void){			//還要修+address
 		}
 	}
 }
-void buildLitTab(int index,list ptr){
+void buildLitTab(int index, list ptr, Use use){
 	int flag = 0;
 	list node = newnode();			//存到LitTab 
 	node -> extend = '=';
 	strcpy(node->opcode, ptr->oper1);
+	node -> block = use;
 	
 	list temp = newnode();			//存到Lit_head 
 	strcpy(temp->name, "*");
-	temp->extend = '=';
+	temp -> extend = '=';
 	strcpy(temp->opcode, node->opcode);
-	temp->mark = '\0';
+	temp -> mark = '\0';
 	strcpy(temp->oper1, "\0");
-	temp->oper = '\0';
+	temp -> oper = '\0';
 	strcpy(temp->oper2, "\0");
-			
+	temp -> block = use;
+	
 	if(litTab[index] == NULL){	
 		litTab[index] = newnode();
 		litTab[index] = node;
@@ -284,6 +300,7 @@ void printSymTab(void){
 void buildSymTab(int index,list node){
 	list ptr = newnode();
 	ptr -> address = node -> address;
+	ptr -> block = node -> block;
 	strcpy(ptr->name, node->name);
 	
 	if(symTab[index] == NULL){
@@ -304,10 +321,59 @@ void clearList(void){
 	}
 	lit_head = NULL;
 }
+list searchSymTab(list ptr, char* str){
+	while(ptr != NULL){
+		if(!strcmp(ptr->name, str)){		//find 
+			return ptr;
+		}else{
+			ptr = ptr -> next;
+		}
+	}
+	return NULL;
+}
+Use buildBlock(char* str){
+	Use u = newBlock();
+	strcpy(u->name, str);
+	u -> num = use_num++;
+	if(useHead == NULL){
+		useHead = u;
+	}else{
+		Use tmp = useHead;
+		while(tmp->next != NULL){
+			tmp = tmp -> next;
+		}
+		tmp -> next = u;
+	}
+	return u;
+}
+Use searchBlock(char* str){
+	Use tmp = useHead;
+	while(tmp != NULL){
+		if(!strcmp(tmp->name, str)){
+			return tmp;
+		}else{
+			tmp = tmp -> next;
+		}
+	}
+	return NULL;
+}
+int searchOpTab(char* str){
+	int i;
+	for(i=0; i<primeTable; i++){
+		if(!strcmp(optab[i].name, str)){
+			return i;
+		}
+	}
+	return -1;
+}
 void onepass(char* fname){	//建 symTab、litTab、address	
 	char c;
 	char str[100];
 	int flag, index=0, tabIndex=0;
+	useHead = newBlock();
+	useHead -> num = 0;
+	strcpy(useHead->name, "DEFAULT");
+	Use use = useHead;
 	
 	FILE *fp = fopen(fname,"r");	//讀取檔案
 	while(1){
@@ -319,35 +385,96 @@ void onepass(char* fname){	//建 symTab、litTab、address
 			str[index] = '\0';
 			index = 0;
 			
-			if(str[0] == '.') continue; 		//註解跳過 		
-					
+			if(str[0] == '.') continue; 		//註解跳過 
+								
 			list node = setnode(&str[0]);	//把str的內容分類 ，並串起來 
 			
+			if(!strcmp(node->opcode, "USE")){	//USE 分 BLOCK 
+				if(strlen(node->oper1) == 0){	//為第一區
+					 use = useHead;
+				}else{
+					if(searchBlock(node->oper1) == NULL){	//沒有定義block的就創一個 
+						use = buildBlock(node->oper1);
+					}
+				}
+			}
+			node -> block = use;
+			node -> address = use -> counter;
+			strcmp(node->target, "\0");
 			
 			if(node->mark == '='){			//literal
 				tabIndex = Hash(node->oper1);
-				buildLitTab(tabIndex, node);
+				buildLitTab(tabIndex, node, use);
 			}
 			if(!strcmp(node->opcode, "LTORG")){ //LTORG 常數要加在下面一行 
 				node -> next = lit_head;
+				lit_head -> address = node -> address;
 				clearList();
 			}
 			if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
 				node -> next = lit_head;
+				lit_head -> address = node -> address;
 				clearList();
 			}
-			
-			if(node->name[0] != '\0' && strcmp(node->name, "COPY") != 0){	//symTab
-				tabIndex = Hash(node->name);
-				buildSymTab(tabIndex, node);
+			if(!strcmp(node->opcode, "EQU")){	//EQU 要做運算 + - * /之外的不做運算 
+				tabIndex = Hash(node->oper1); 
+				list op1 = searchSymTab(symTab[tabIndex], node->oper1);
+				tabIndex = Hash(node->oper2);
+				list op2 = searchSymTab(symTab[tabIndex], node->oper2);
+				if(node->oper == '+'){
+					node->address = op1->address + op2->address;
+				}else if(node->oper == '-'){
+					node->address = op1->address - op2->address;
+				}else if(node->oper == '*'){
+					node->address = op1->address * op2->address;
+				}else if(node->oper == '/'){
+					node->address = op1->address / op2->address;
+				}
 			}
-			
-			
-			
-			if(flag==EOF) break;
+			//課本2-11 
+			if(!strcmp(node->opcode, "START")){
+				node -> address = atoi(node->oper1);
+				use -> address = atoi(node->oper1);
+				use -> counter = atoi(node->oper1);
+			}else{
+				int len = 0;
+				int num = searchOpTab(node->opcode);
+				if(num != -1){
+					if(optab[num].format[0] == '2'){
+						len = 2;
+					}else if(node->extend == '+'){
+						len = 4;
+					}else{
+						len = 3;
+					}
+				}else if(!strcmp(node->opcode, "WORD")){
+					len = 3;
+				}else if(!strcmp(node->opcode, "RESW")){
+					len = 3 * atoi(node->oper1);
+				}else if(!strcmp(node->opcode, "RESB")){
+					len = atoi(node->oper1);
+				}else if(!strcmp(node->opcode, "BYTE")){
+					len = strlen(node->oper1) - 3;
+					if(node->oper1[0] == 'X') len /= 2;
+				}
+				if(node->name[0] != '\0'){	//symTab
+					tabIndex = Hash(node->name);
+					buildSymTab(tabIndex, node);
+				}
+				use->counter += len;
+				printf("%s %04X\n",node->opcode,use->counter);
+				len = 0;
+			}
+			if(flag == EOF) break;
 		}
 	}
-	 
+	int cnt = useHead -> address;
+	use = useHead;
+	while(use != NULL){
+		use -> address = cnt;
+		cnt += use -> counter;
+		use = use -> next;
+	}
 }
 
 int main(){	
@@ -357,7 +484,6 @@ int main(){
 //	printSymTab();
 	//symTab("srcpro2.11.txt");
 	Print();
-	
 	//印出 pool
 	//印出 OpTab
 	//印出 SymTab
