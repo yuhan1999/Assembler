@@ -98,7 +98,7 @@ void Print(void){
 		ptr = ptr->next; 
 	}
 }
-list setnode(char* str){		//把node串起來 
+list setnode(char* str){		//把node做分類並串起來 head
 	list node = newnode();
 	int i = 0, j = 0, flag = 0, temp;
 	char tmp[10];
@@ -220,10 +220,20 @@ void printLitTab(void){			//還要修+address
 	}
 }
 void buildLitTab(int index,list ptr){
-	list node = newnode();
+	int flag = 0;
+	list node = newnode();			//存到LitTab 
 	node -> extend = '=';
 	strcpy(node->opcode, ptr->oper1);
 	
+	list temp = newnode();			//存到Lit_head 
+	strcpy(temp->name, "*");
+	temp->extend = '=';
+	strcpy(temp->opcode, node->opcode);
+	temp->mark = '\0';
+	strcpy(temp->oper1, "\0");
+	temp->oper = '\0';
+	strcpy(temp->oper2, "\0");
+			
 	if(litTab[index] == NULL){	
 		litTab[index] = newnode();
 		litTab[index] = node;
@@ -231,30 +241,41 @@ void buildLitTab(int index,list ptr){
 		list tmp = litTab[index];
 		while(tmp -> next != NULL){
 			if(strcmp(tmp->opcode, node->opcode) == 0){	//有重複 
+				flag = 1;
 				break;
 			}else{
 				tmp = tmp -> next;
 			}
 		}
-		if(strcmp(tmp->opcode, node->opcode) != 0){
+		if(flag == 0){
+			printf("break;");
+			printf("%s\n",node->opcode);
+			printf("break");
 			tmp -> next = node;
-			
-			list temp = newnode();
-			strcpy(temp->name, "*");
-			temp->extend = '=';
-			strcpy(temp->opcode, node->opcode);
-			
-			if(lit_head == NULL){
-				lit_head = temp;
-			}else{
-				list t = lit_head;
-				while(t -> next != NULL){
-					t = t -> next;
-				}
-				t -> next = temp;
-			}	
+			printf("%s->%s\n\n",node->opcode,node->next->opcode);
+			printf("break");
 		}
 	}
+	
+	if(flag == 0){
+		if(lit_head == NULL){
+			lit_head = temp;
+		}else{
+			list t = lit_head;
+			while(t -> next != NULL){
+				t = t -> next;
+			}
+			t -> next = temp;
+		}
+	}
+	list t = lit_head;
+	while(t != NULL){
+		printf("%d %s lit_head :",flag,temp->opcode);
+		printf("%-6s%5c%-6s%5c%-6s%5c%-s\n",t->name,t->extend,t->opcode,t->mark,t->oper1,t->oper,t->oper2);
+		t = t -> next;
+	}
+	
+	
 }
 void printSymTab(void){
 	int i, j=1;
@@ -288,12 +309,12 @@ void buildSymTab(int index,list node){
 	}
 }
 void clearList(list first){
-	list ptr;
+	list ptr = first;
+	list tmp;
 	while(first != NULL){
-		ptr = first;
 		first = first -> next;
-		free(ptr);
 	}
+	first = NULL;
 }
 void onepass(char* fname){	//建 symTab、litTab、address	
 	char c;
@@ -345,8 +366,8 @@ void onepass(char* fname){	//建 symTab、litTab、address
 int main(){	
 	//建 SymTab
 	onepass("srcpro2.9.txt");
-	printLitTab();
-	printSymTab();
+//	printLitTab();
+//	printSymTab();
 	//symTab("srcpro2.11.txt");
 	Print();
 	
