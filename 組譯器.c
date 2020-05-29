@@ -51,7 +51,7 @@ void buildLitTab(int,list);
 void buildSymTab(int,list); 
 void printLitTab(void);
 void printSymTab(void);
-void clearList(list);
+void clearList(void);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
 	{"LDB","m","3/4","68"},
@@ -247,13 +247,10 @@ void buildLitTab(int index,list ptr){
 				tmp = tmp -> next;
 			}
 		}
-		if(flag == 0){
-			printf("break;");
-			printf("%s\n",node->opcode);
-			printf("break");
+		if(strcmp(tmp->opcode, node->opcode) != 0){
 			tmp -> next = node;
-			printf("%s->%s\n\n",node->opcode,node->next->opcode);
-			printf("break");
+		}else{
+			flag = 1;
 		}
 	}
 	
@@ -267,15 +264,7 @@ void buildLitTab(int index,list ptr){
 			}
 			t -> next = temp;
 		}
-	}
-	list t = lit_head;
-	while(t != NULL){
-		printf("%d %s lit_head :",flag,temp->opcode);
-		printf("%-6s%5c%-6s%5c%-6s%5c%-s\n",t->name,t->extend,t->opcode,t->mark,t->oper1,t->oper,t->oper2);
-		t = t -> next;
-	}
-	
-	
+	}	
 }
 void printSymTab(void){
 	int i, j=1;
@@ -308,13 +297,12 @@ void buildSymTab(int index,list node){
 		tmp -> next = ptr;
 	}
 }
-void clearList(list first){
-	list ptr = first;
-	list tmp;
-	while(first != NULL){
-		first = first -> next;
+void clearList(void){
+	list ptr = lit_head;
+	while(lit_head != NULL){
+		lit_head = lit_head -> next;
 	}
-	first = NULL;
+	lit_head = NULL;
 }
 void onepass(char* fname){	//建 symTab、litTab、address	
 	char c;
@@ -342,14 +330,13 @@ void onepass(char* fname){	//建 symTab、litTab、address
 			}
 			if(!strcmp(node->opcode, "LTORG")){ //LTORG 常數要加在下面一行 
 				node -> next = lit_head;
-				clearList(lit_head);
+				clearList();
 			}
-		
-		/*	if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
+			if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
 				node -> next = lit_head;
-				clearList(lit_head);
+				clearList();
 			}
-		*/	
+			
 			if(node->name[0] != '\0' && strcmp(node->name, "COPY") != 0){	//symTab
 				tabIndex = Hash(node->name);
 				buildSymTab(tabIndex, node);
