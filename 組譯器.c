@@ -54,12 +54,13 @@ void buildLitTab(int,list,Use);
 void buildSymTab(int,list); 
 void printLitTab(void);
 void printSymTab(void);
-void clearList(void);
+void clearList(Use);
 list searchSymTab(list,char*);
 Use newBlock(void);
 Use buildBlock(char*);
 Use searchBlock(char*);
 int searchOpTab(char*);
+list searchLitTab(list,char*);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
 	{"LDB","m","3/4","68"},
@@ -314,9 +315,31 @@ void buildSymTab(int index,list node){
 		tmp -> next = ptr;
 	}
 }
-void clearList(void){
-	list ptr = lit_head;
+list searchLitTab(list ptr, char* str){
+	while(ptr != NULL){
+		if(!strcmp(ptr->opcode, str)){
+			return ptr;
+		}else{
+			ptr = ptr -> next;
+		}
+	}
+	return NULL;
+}
+void clearList(Use use){
+	int index;
+	list ptr;
 	while(lit_head != NULL){
+		index = Hash(lit_head->opcode);
+		ptr = searchLitTab(litTab[index], lit_head->opcode);
+		lit_head -> address = use -> counter;
+		ptr -> address = use -> counter;
+		ptr -> block = use;
+		lit_head -> block = use;
+		if(lit_head -> opcode[0] == 'C'){
+			use -> counter += strlen(lit_head -> opcode) - 3;
+		}else if(lit_head -> opcode[0] == 'X'){
+			use -> counter += (strlen(lit_head -> opcode) - 3) / 2;
+		}
 		lit_head = lit_head -> next;
 	}
 	lit_head = NULL;
@@ -359,7 +382,7 @@ Use searchBlock(char* str){
 }
 int searchOpTab(char* str){
 	int i;
-	for(i=0; i<primeTable; i++){
+	for(i=0; i<20; i++){
 		if(!strcmp(optab[i].name, str)){
 			return i;
 		}
@@ -408,13 +431,11 @@ void onepass(char* fname){	//建 symTab、litTab、address
 			}
 			if(!strcmp(node->opcode, "LTORG")){ //LTORG 常數要加在下面一行 
 				node -> next = lit_head;
-				lit_head -> address = node -> address;
-				clearList();
+				clearList(use);
 			}
 			if(!strcmp(node->opcode, "END")){	//END 常數要加在下面一行 
 				node -> next = lit_head;
-				lit_head -> address = node -> address;
-				clearList();
+				clearList(use);
 			}
 			if(!strcmp(node->opcode, "EQU")){	//EQU 要做運算 + - * /之外的不做運算 
 				tabIndex = Hash(node->oper1); 
@@ -462,7 +483,6 @@ void onepass(char* fname){	//建 symTab、litTab、address
 					buildSymTab(tabIndex, node);
 				}
 				use->counter += len;
-				printf("%s %04X\n",node->opcode,use->counter);
 				len = 0;
 			}
 			if(flag == EOF) break;
