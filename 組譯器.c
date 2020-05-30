@@ -40,7 +40,7 @@ typedef struct Reg{			//build register Table
 
 list symTab[primeTable];
 list litTab[primeTable];
-char fname[20];
+char Fname[20];
 int use_num = 1;
 list head = NULL;
 list lit_head = NULL;
@@ -48,7 +48,7 @@ Use useHead = NULL;
 void onepass(char*);
 list newnode(void);
 list setnode(char*);
-void Print(void);
+void printPool(void);
 int Hash(char*);
 void buildLitTab(int,list,Use);
 void buildSymTab(int,list); 
@@ -106,11 +106,17 @@ list newnode(){				//新增一個 node
 	node -> next = NULL;
 	return node;
 }
-void Print(void){
+void printPool(void){
+	int i = 1;
+	FILE* fp = fopen("OBJFILE.txt","w");
+	fprintf(fp,"Filename: %s\n",Fname);
+	fprintf(fp,"------------------------------【Literal Pool】------------------------------\n");
+	fprintf(fp,"%3s%8s%6s\t%s\t\t\t\t\t%s\n\n","Row","Address","Block","Code","Target");
 	list ptr = head;
 	while(ptr != NULL){
-		printf("%04X  %-6s%5c%-6s%5c%-6s%5c%-s\n",ptr->address,ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2);
-		ptr = ptr->next; 
+		fprintf(fp,"%-4d %04X%6d\t\t%-6s%5c%-6s%5c%-6s%5c%-s\n",i,ptr->address,ptr->block->num,ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2);
+		ptr = ptr->next;
+		i++;
 	}
 }
 list setnode(char* str){		//把node做分類並串起來 head
@@ -221,6 +227,7 @@ int Hash(char* str){
 }
 void printLitTab(void){			//還要修+address  
 	int i, j=1;
+	printf("Filename: %s\n",Fname);
 	printf("---------------【LITTAB】---------------\n");
 	printf("%4s%10s%10s     \n","Row","LitName","Address");
 	for(i=0; i<primeTable; i++){
@@ -285,8 +292,9 @@ void buildLitTab(int index, list ptr, Use use){
 }
 void printSymTab(void){
 	int i, j=1;
-	printf("\n---------------【SYMTAB】---------------\n");
-	printf("%4s%10s%10s     \n","Row","Symbol","Address");
+	printf("\nFilename: %s\n",Fname);
+	printf("---------------【SYMTAB】---------------\n");
+	printf("%4s%10s%10s     \n","Row","SymName","Address");
 	for(i=0; i<primeTable; i++){
 		if(symTab[i] != NULL){
 			list ptr = symTab[i];
@@ -389,7 +397,8 @@ int searchOpTab(char* str){
 	}
 	return -1;
 }
-void onepass(char* fname){	//建 symTab、litTab、address	
+void onepass(char* fname){	//建 symTab、litTab、address
+	sprintf(Fname,"%s",fname);
 	char c;
 	char str[100];
 	int flag, index=0, tabIndex=0;
@@ -497,13 +506,14 @@ void onepass(char* fname){	//建 symTab、litTab、address
 	}
 }
 
+
 int main(){	
 	//建 SymTab
 	onepass("srcpro2.9.txt");
+	//onepass("srcpro2.11.txt");
 //	printLitTab();
 //	printSymTab();
-	//symTab("srcpro2.11.txt");
-	Print();
+//	printPool();
 	//印出 pool
 	//印出 OpTab
 	//印出 SymTab
