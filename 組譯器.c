@@ -45,6 +45,8 @@ int use_num = 1;
 list head = NULL;
 list lit_head = NULL;
 Use useHead = NULL;
+int base, pc;
+
 void onepass(char*);
 list newnode(void);
 list setnode(char*);
@@ -61,6 +63,8 @@ Use buildBlock(char*);
 Use searchBlock(char*);
 int searchOpTab(char*);
 list searchLitTab(list,char*);
+void twopass(void);
+int searchReg(char*);
 opTable optab[] = {	 		//建 opTab 
 	{"STL","m","3/4","14"},
 	{"LDB","m","3/4","68"},
@@ -114,7 +118,7 @@ void printPool(void){
 	fprintf(fp,"%3s%8s%6s\t%s\t\t\t\t\t%s\n\n","Row","Address","Block","Code","Target");
 	list ptr = head;
 	while(ptr != NULL){
-		fprintf(fp,"%-4d %04X%6d\t\t%-6s%5c%-6s%5c%-6s%5c%-s\n",i,ptr->address,ptr->block->num,ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2);
+		fprintf(fp,"%-4d %04X%6d\t\t%-6s%5c%-6s%5c%-6s%5c%-s%-s\n",i,ptr->address,ptr->block->num,ptr->name,ptr->extend,ptr->opcode,ptr->mark,ptr->oper1,ptr->oper,ptr->oper2,ptr->target);
 		ptr = ptr->next;
 		i++;
 	}
@@ -397,6 +401,15 @@ int searchOpTab(char* str){
 	}
 	return -1;
 }
+int searchReg(char* str){
+	int i;
+	for(i=0; i<20; i++){
+		if(!strcmp(regtab[i].name, str)){
+			return i;
+		}
+	}
+	return -1;
+}
 void onepass(char* fname){	//建 symTab、litTab、address
 	sprintf(Fname,"%s",fname);
 	char c;
@@ -505,15 +518,132 @@ void onepass(char* fname){	//建 symTab、litTab、address
 		use = use -> next;
 	}
 }
-
-
+void twopass(){
+	list ptr = head;
+	int index, opn, num, xbpe, disp, i;
+	list tmp;
+	char str[10],dispStr[10];
+	while(ptr != NULL){
+		if(!strcmp(ptr->opcode, "BASE")){
+			index = Hash(ptr->opcode);
+			tmp = searchSymTab(symTab[index], ptr->opcode);
+			if(tmp != NULL){
+				base = tmp -> address;
+			}
+		}else{
+			index = searchOpTab(ptr->opcode);
+			printf("%d %s",index,ptr->opcode);
+			if(index == -1){
+				printf("next");
+				opn = (int)strtol(optab[index].code, NULL, 16);
+				if(ptr->mark == '#'){
+					opn += 1;
+				}else if(ptr->mark == '@'){
+					opn += 2;
+				}else{
+					opn += 3;
+				}
+				
+				int Index;
+				Index = Hash(ptr->oper1);
+				if(ptr->mark == '='){		//oper1 is literal
+					tmp = searchLitTab(litTab[Index], ptr->oper1);
+				}else{		//oper1 is symbol
+					tmp = searchSymTab(symTab[Index], ptr->oper1);
+				}
+				
+				if(ptr->extend == '+'){		//set pc
+					pc = ptr->address + 4;
+				}else if(optab[Index].format[0] == '3'){
+					pc = ptr->address + 3;
+				}else{
+					pc = ptr->address + 2;
+				}
+				
+				xbpe = 0;
+				if(ptr->extend == '+'){		//格式四  x = 1 : xx1xxxxx 
+					if(tmp != NULL){
+						sprintf(str, "%.2X1%05X", opn, ptr->address);
+					printf("opn:%02X  address:%X  ",opn, ptr->address);
+					}else{
+						sprintf(str, "%.2X1%05X", opn, atoi(ptr->oper1));
+					printf("opn:%.2X  atoi:%x",opn, atoi(ptr->oper1));
+					}
+					strcpy(ptr->target, str);
+					printf("%10X\n",ptr->target);
+					memset(str, '\0', 10);
+				}else if(optab[Index].format[0] == '3'){	//格式三  
+					if(tmp == NULL){	//not literal & symbol
+						num = atoi(ptr->oper1);
+						sprintf(str, "%X", num);
+					}else{
+						disp = tmp->address + tmp->block->address - pc;
+						if(-2048<disp && disp< 2047){	//base
+							xbpe += 4;
+							disp = tmp->address - base; //TA - base
+						}else{	//program counter
+							xbpe += 2;	//TA - pc
+						}
+						sprintf(dispStr, "%s", disp);
+						if(disp < 0){
+							sprintf(dispStr, "%s", dispStr+5);
+						}
+						if(!strcmp(tmp->oper2, "X")){
+							xbpe += 8;
+						}
+					}
+					sprintf(str, "%X%X%s",opn, xbpe, dispStr);
+					strcmp(tmp->target, str);
+				}else{	//格式二 
+					opn -= 3;
+					sprintf(str, "%X%X%X", opn, searchReg(tmp->oper1), searchReg(tmp->oper2));
+					strcpy(tmp->target, str);
+				}
+			}else if(tmp->extend == '='){
+				int cnt = 0;
+				for(i=2; i<strlen(tmp->opcode)-3; i++){
+					if(tmp->opcode[0] == 'C'){
+						tmp->target[cnt++] = tmp->opcode[i] / 16 + '0';
+						if(tmp->opcode[i]%16 >= 10){
+							tmp->target[cnt++] = tmp->opcode[i] % 16 + '7';
+						}else{
+							tmp->target[cnt++] = tmp->opcode[i] % 16 + '0';
+						}
+					}else{
+						tmp->target[cnt++] = tmp->opcode[i];
+					}
+				}
+				tmp->target[cnt] == '\0';
+			}else if(!strcmp(tmp->opcode, "BYTE")){
+				int cnt = 0;
+				for(i=2; i<strlen(tmp->oper1)-3; i++){
+					if(tmp->oper1[0] == 'C'){
+						tmp->target[cnt++] = tmp->oper1[i] / 16 + '0';
+						if(tmp->opcode[i]%16 >= 10){
+							tmp->target[cnt++] = tmp->oper1[i] % 16 + '7';
+						}else{
+							tmp->target[cnt++] = tmp->oper1[i] % 16 + '0';
+						}
+					}else{
+						tmp->target[cnt++] = tmp->oper1[i];
+					}
+				}
+				tmp->target[cnt] == '\0';
+			}else if(!strcmp(tmp->opcode, "WORD")){
+				sprintf(tmp->target, "%X", atoi(tmp->oper1));
+			}
+		}
+		ptr = ptr -> next;	
+	}
+}
 int main(){	
 	//建 SymTab
 	onepass("srcpro2.9.txt");
+	twopass();
 	//onepass("srcpro2.11.txt");
 //	printLitTab();
 //	printSymTab();
-//	printPool();
+	printPool();
 	//印出 pool
 	//印出 OpTab
 	//印出 SymTab
