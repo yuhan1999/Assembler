@@ -3,7 +3,6 @@
 #include<string.h>
 #define OP 20  //設 opTable 有 20 個 
 #define primeTable 11
-
 typedef struct OpTable{		//build Table
 	char name[10];
 	char infro[10];
@@ -13,8 +12,8 @@ typedef struct OpTable{		//build Table
 }opTable;
 typedef struct Locctr* Use;
 typedef struct Locctr{
-	int counter;	//size
-	int address;	//start
+	int counter;	
+	int address;	
 	char name[10];	//block name
 	int num;		//bloc number
 	Use next;
@@ -415,6 +414,7 @@ void onepass(char* fname){	//建 symTab、litTab、address
 	char c;
 	char str[100];
 	int flag, index=0, tabIndex=0;
+	memset(str,'\0',100);
 	useHead = newBlock();
 	useHead -> num = 0;
 	strcpy(useHead->name, "DEFAULT");
@@ -431,21 +431,20 @@ void onepass(char* fname){	//建 symTab、litTab、address
 			index = 0;
 			
 			if(str[0] == '.') continue; 		//註解跳過 
-								
-			list node = setnode(&str[0]);	//把str的內容分類 ，並串起來 
-			
+			list node = setnode(str);	//把str的內容分類 ，並串起來 
 			if(!strcmp(node->opcode, "USE")){	//USE 分 BLOCK 
-				if(strlen(node->oper1) == 0){	//為第一區
+				if(!strcmp(node->oper1, "\0")){	//為第一區
 					 use = useHead;
 				}else{
-					if(searchBlock(node->oper1) == NULL){	//沒有定義block的就創一個 
+					use =  searchBlock(node->oper1);
+					if(use == NULL){	//沒有定義block的就創一個 
 						use = buildBlock(node->oper1);
 					}
 				}
 			}
 			node -> block = use;
 			node -> address = use -> counter;
-			strcmp(node->target, "\0");
+			strcpy(node->target, "\0");
 			
 			if(node->mark == '='){			//literal
 				tabIndex = Hash(node->oper1);
@@ -637,9 +636,9 @@ void twopass(){
 }
 int main(){	
 	//建 SymTab
-	onepass("srcpro2.9.txt");
-	twopass();
-	//onepass("srcpro2.11.txt");
+//	onepass("srcpro2.9.txt");
+	onepass("srcpro2.11.txt");
+	twopass();	
 	printLitTab();
 	printSymTab();
 	printPool();
